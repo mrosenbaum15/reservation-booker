@@ -2,8 +2,8 @@
 
 1.  
 
-    `export AUTH_TOKEN=<your-resy-auth-token>`
-    `export API_KEY=<your-resy-api-key>`
+    export AUTH_TOKEN=<your-resy-auth-token>
+    export API_KEY=<your-resy-api-key>
 
 2. Set the variables in `vars.py`
 
