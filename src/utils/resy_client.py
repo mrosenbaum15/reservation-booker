@@ -4,6 +4,13 @@ from datetime import datetime, timedelta
 from utils.vars import *
 
 class ResyClient:
+    common_headers = {
+        "Authorization": 'ResyAPI api_key="' + API_KEY + '"',
+        'content-type': "application/x-www-form-urlencoded; charset=utf-8",
+        'origin': 'https://resy.com',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+    
     def timeInRange(self, start):
         start_in_range = start >= datetime.strptime(BOOKING_TIME_RANGE_START, '%Y-%m-%d %H:%M:%S')
         end_in_range = start <= datetime.strptime(BOOKING_TIME_RANGE_END, '%Y-%m-%d %H:%M:%S')
@@ -26,57 +33,62 @@ class ResyClient:
 
     def get_openings(self):
         params = {
-            'day': BOOKING_DATE,
             'lat': LAT,
-            'location': CITY,
             'long': LONG,
+            'day': BOOKING_DATE,
+            'location': CITY,
             'party_size': PARTY_SIZE,
-            'venue_id': RESTAURANT_ID,
-            'sort_by': 'available'
-        }
-
-        headers = {
-            'Authorization': 'ResyAPI api_key="' + API_KEY + '"',
+            'venue_id': RESTAURANT_ID
         }
         
         url = RESY_BASE_URL + '/4/find'
-        r = requests.get(url, params=params, headers=headers)
+        r = requests.get(url, params=params, headers=self.common_headers, timeout=1)
+        print(r)
         data = json.loads(r.content)
-        print('\nAvailability results: ', data, '\n')
         openings = data['results']['venues'][0]['slots']
         return self.find_booking_config_token(openings)
 
         
     def get_reservation_details(self, config_token):
-        headers = {
-            'Authorization': 'ResyAPI api_key="' + API_KEY + '"',
-            'accept': 'application/json',
-            'content-type': 'application/x-www-form-urlencoded'
-        }
-
+        headers = self.common_headers
+ 
         params = {
-            'day': '2023-03-22',
-            'party_size': 2,
+            'day': BOOKING_DATE,
+            'party_size': PARTY_SIZE,
             'config_id': config_token
         }
         
-        r = requests.get(RESY_BASE_URL + '/3/details', params=params, headers=headers)
+        r = requests.get(RESY_BASE_URL + '/3/details', params=params, headers=headers, timeout=5)
+        print(r)
         data = json.loads(r.content)
+        print(data)
         return data['book_token']['value']
 
     
     def make_reservation(self, book_token):
-        headers = {
-            'Authorization': 'ResyAPI api_key="' + API_KEY + '"',
-            'accept': 'application/json',
-            'content-type': 'application/x-www-form-urlencoded',
-            'x-resy-auth-token': AUTH_TOKEN
-        }
-
+        headers = self.common_headers
+        headers['accept'] = 'application/json'
+        headers['x-resy-auth-token'] = AUTH_TOKEN
+       
+        # headers = {
+        #     'Authorization': 'ResyAPI api_key="' + API_KEY + '"',
+        #     'accept': 'application/json',
+        #     'content-type': 'application/x-www-form-urlencoded',
+        #     'X-Resy-Auth-Token': AUTH_TOKEN,
+        #     'origin': 'https://widgets.resy.com/',
+        #     'Cache-Control': 'no-cache'
+        # }
+        
+        payment = f'{{"id":{PAYMENT_ID}}}'
+        print(payment)
         newParams = {
                 'book_token': book_token,
-                'struct_payment_method': '{"id":13620270}',
+                'struct_payment_method': payment,
                 'source_id': 'resy.com-venue-details'
             }
-        r = requests.post(RESY_BASE_URL + '/3/book', data=newParams, headers=headers)
+            
+        r = requests.post(RESY_BASE_URL + '/3/book', data=newParams, headers=headers, timeout=10)
         print('Status of reservation request: ', r.content)
+        if r.status_code != 201:
+            print(r.status_code)
+            raise Exception('Error making reservation. Trying again.')
